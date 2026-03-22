@@ -4,7 +4,7 @@ from datetime import datetime
 import io
 
 # 1. Configuración de la aplicación
-st.set_page_config(page_title="Control Rivas", layout="wide")
+st.set_page_config(page_title="Control TC", layout="wide")
 
 # 2. Estilo Visual Compacto
 st.markdown("""
