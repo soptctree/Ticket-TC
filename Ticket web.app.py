@@ -4,54 +4,52 @@ from streamlit_gsheets import GSheetsConnection
 import io
 
 # 1. Configuración de pantalla
-st.set_page_config(page_title="Control Rivas - Pro", layout="wide")
+st.set_page_config(page_title="Control Evento Rivas", layout="wide")
 
-# 2. Intento de Conexión Robusta
+# 2. Conexión a Google Sheets
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    # Leemos la hoja. Si falla aquí, el error está en los Secrets o Permisos
-    df_base = conn.read(ttl="0") 
+    # ttl="0" obliga a traer los datos reales de la nube siempre
+    df_base = conn.read(ttl="0")
     
+    # Limpiar espacios en los nombres de las columnas por si acaso
+    df_base.columns = df_base.columns.str.strip()
+
     if 'ventas' not in st.session_state:
-        # Convertimos la columna PRODUCTO en el índice para manejar los datos fácil
+        # Cargamos los datos desde el Excel a la memoria del celular/PC
         st.session_state.ventas = df_base.set_index('PRODUCTO')['CANTIDAD'].to_dict()
         st.session_state.precios = df_base.set_index('PRODUCTO')['PRECIO'].to_dict()
         st.session_state.autenticado = False
 
 except Exception as e:
-    st.error("❌ ERROR DE CONEXIÓN")
-    st.info("""
-    **Por favor, revisa lo siguiente:**
-    1. Que la URL en **Settings > Secrets** sea la correcta.
-    2. Que tu Google Sheets tenga permiso de **Editor** para 'Cualquier persona con el enlace'.
-    3. Que las columnas se llamen exactamente: **PRODUCTO**, **CANTIDAD** y **PRECIO**.
-    """)
+    st.error(f"❌ Error de Conexión: {e}")
     st.stop()
 
-# 3. Función para guardar en la nube
+# 3. Función para guardar cambios en la nube
 def sincronizar():
-    df_update = pd.DataFrame({
-        'PRODUCTO': list(st.session_state.ventas.keys()),
-        'CANTIDAD': list(st.session_state.ventas.values()),
-        'PRECIO': list(st.session_state.precios.values())
-    })
-    conn.update(data=df_update)
-    st.toast("✅ Guardado en Google Sheets")
+    try:
+        df_update = pd.DataFrame({
+            'PRODUCTO': list(st.session_state.ventas.keys()),
+            'CANTIDAD': list(st.session_state.ventas.values()),
+            'PRECIO': list(st.session_state.precios.values())
+        })
+        conn.update(data=df_update)
+        st.toast("✅ Sincronizado con Google Sheets")
+    except:
+        st.error("No se pudo guardar en la nube. Revisa el internet.")
 
-# --- INTERFAZ DE USUARIO ---
-st.title("🚀 SISTEMA DE CONTROL PERMANENTE")
-st.write("Los datos se guardan automáticamente en la nube.")
+# --- INTERFAZ ---
+st.title("🚀 REGISTRO DE ENTRADAS - EVENTO RIVAS")
 
-# Cuadrícula de productos (5 columnas)
-cols = st.columns(5)
-productos_lista = list(st.session_state.ventas.keys())
+# Mostrar botones en 4 columnas para que se vea bien en celular
+cols = st.columns(4)
+productos = list(st.session_state.ventas.keys())
 
-for i, producto in enumerate(productos_lista):
-    with cols[i % 5]:
+for i, producto in enumerate(productos):
+    with cols[i % 4]:
         with st.container(border=True):
             st.markdown(f"**{producto}**")
-            cant = st.session_state.ventas[producto]
-            st.write(f"Tickets: {cant}")
+            st.write(f"Tickets: {st.session_state.ventas[producto]}")
             
             c1, c2 = st.columns(2)
             if c1.button("➕", key=f"add_{i}"):
@@ -65,46 +63,17 @@ for i, producto in enumerate(productos_lista):
                     sincronizar()
                     st.rerun()
 
-# --- SECCIÓN DE ADMINISTRACIÓN ---
+# --- REPORTE ---
 st.divider()
-with st.expander("🔐 Panel de Arqueo y Reportes"):
-    if not st.session_state.autenticado:
-        clave = st.text_input("Introduce la clave de acceso", type="password")
-        if clave == "2802":
-            st.session_state.autenticado = True
-            st.rerun()
-    else:
-        st.success("Acceso concedido")
-        # Generar tabla de reporte
-        datos_reporte = []
-        for p in productos_lista:
-            c = st.session_state.ventas[p]
+with st.expander("🔐 Ver Arqueo Total"):
+    clave = st.text_input("Clave Admin", type="password")
+    if clave == "2802":
+        data = []
+        for p in productos:
+            cant = st.session_state.ventas[p]
             pre = st.session_state.precios.get(p, 0)
-            datos_reporte.append({
-                "PRODUCTO": p,
-                "CANTIDAD": c,
-                "PRECIO": pre,
-                "SUBTOTAL": c * pre
-            })
+            data.append({"PRODUCTO": p, "CANTIDAD": cant, "PRECIO": pre, "TOTAL": cant * pre})
         
-        df_final = pd.DataFrame(datos_reporte)
-        st.dataframe(df_final, use_container_width=True, hide_index=True)
-        
-        total = df_final["SUBTOTAL"].sum()
-        st.metric("TOTAL RECAUDADO", f"C$ {total:,.2f}")
-        
-        # Botón para descargar Excel
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_final.to_excel(writer, index=False)
-        
-        st.download_button(
-            label="📥 Descargar Reporte Excel",
-            data=output.getvalue(),
-            file_name=f"Arqueo_{producto}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        
-        if st.button("Cerrar Sesión"):
-            st.session_state.autenticado = False
-            st.rerun()
+        df_final = pd.DataFrame(data)
+        st.table(df_final)
+        st.metric("RECAUDACIÓN TOTAL", f"C$ {df_final['TOTAL'].sum():,.2f}")
