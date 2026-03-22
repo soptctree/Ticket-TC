@@ -1,20 +1,44 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import io # Necesario para generar el Excel real
 
-# Configuración compacta
+# Configuración compacta y ancha
 st.set_page_config(page_title="Control Rivas", layout="wide")
 
-# Estilo CSS para que los botones sean más pequeños y la pantalla se ajuste mejor
+# --- CSS MEJORADO PARA PANTALLA AJUSTABLE ---
 st.markdown("""
     <style>
-    .stButton button { width: 100%; padding: 0.2rem; }
-    div[data-testid="stVerticalBlock"] > div { padding: 0.1rem; }
+    /* Hace los contenedores de productos más bajos y compactos */
+    [data-testid="stVerticalBlock"] > div > div > div[data-testid="stVerticalBlock"] {
+        padding: 0rem !important;
+        margin-bottom: -1rem !important;
+    }
+    /* Reduce márgenes y espacios internos de los cuadros (border=True) */
+    .st-emotion-cache-1r6slb0 {
+        padding: 0.5rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+    /* Botones más pequeños y compactos */
+    .stButton button {
+        width: 100%;
+        padding: 0rem !important;
+        height: 1.8rem !important;
+        min-height: 1.8rem !important;
+    }
+    /* Reduce tamaño del texto del producto */
+    .stMarkdown p {
+        font-size: 0.85rem !important;
+        margin-bottom: 0rem !important;
+    }
+    /* Reduce espacio entre el nombre y los botones */
+    .stHorizontalBlock {
+        gap: 0.2rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 if 'ventas' not in st.session_state:
-    # Nombres limpios para evitar errores de símbolos raros
     productos = [
         "AGUA LUNA VIDRIO", "AGUA GASIFICADA ORIGINA", "AGUA GASIFICA DE LIMON",
         "AGUA LUNA GASIFICADA FRESA", "AGUA LUNA SIN GAS", "BORIAL", "CORONA",
@@ -25,18 +49,18 @@ if 'ventas' not in st.session_state:
         "AGUA LUNA LATA", "NICA HURRACAN", "VITALI", "EXTRA"
     ]
     st.session_state.ventas = {p: 0 for p in productos}
-    st.session_state.precios = {p: 0 for p in productos} # Aquí puedes poner precios reales
+    # He puesto precios de ejemplo para que el reporte salga con datos
+    st.session_state.precios = {p: 100 for p in productos} 
     st.session_state.log = []
 
-st.title("🎫 Registro de Entradas")
+st.title("🎫 Registro de Entradas - Flujo Ágil")
 
-# Usamos 4 columnas en lugar de 3 para que se vea menos estirado (ajuste de pantalla)
-cols = st.columns(4)
+# --- AHORA USAMOS 5 COLUMNAS PARA MÁS AJUSTE ---
+cols = st.columns(5)
 
 for i, producto in enumerate(st.session_state.ventas):
-    with cols[i % 4]:
+    with cols[i % 5]:
         with st.container(border=True):
-            # Nombre en pequeño para ganar espacio
             st.markdown(f"**{producto}**")
             cant = st.session_state.ventas[producto]
             st.write(f"Tickets: {cant}")
@@ -55,11 +79,12 @@ for i, producto in enumerate(st.session_state.ventas):
 
 st.divider()
 
-# SECCIÓN DE REPORTE DETALLADO
-with st.expander("🔐 Generar Reporte Detallado"):
+# SECCIÓN DE REPORTE (Sin el monto recaudado en pantalla)
+with st.expander("🔐 Generar Reporte de Arqueo (Solo Admin)"):
     clave = st.text_input("Clave Admin", type="password")
     if clave == "2802":
-        # Creamos el DataFrame detallado
+        st.write("### Vista Previa del Arqueo")
+        
         datos_reporte = []
         for p, cant in st.session_state.ventas.items():
             precio = st.session_state.precios.get(p, 0)
@@ -71,20 +96,16 @@ with st.expander("🔐 Generar Reporte Detallado"):
             })
         
         df = pd.DataFrame(datos_reporte)
-        
-        # Mostramos tabla detallada en la web
-        st.write("### Vista Previa del Arqueo")
         st.dataframe(df, use_container_width=True, hide_index=True)
         
-        # TOTAL GLOBAL
-        total_recaudado = df["SUBTOTAL"].sum()
-        st.metric("TOTAL RECAUDADO", f"C$ {total_recaudado:,.2f}")
-
-        # BOTÓN DE DESCARGA EXCEL REAL
-        csv = df.to_csv(index=False).encode('utf-8-sig') # El 'utf-8-sig' arregla el problema de Excel
+        # --- LÓGICA PARA DESCARGAR EXCEL REAL (.XLSX) ---
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Arqueo')
+        
         st.download_button(
-            label="📥 DESCARGAR REPORTE DETALLADO (CSV)",
-            data=csv,
-            file_name=f"Arqueo_Rivas_{datetime.now().strftime('%d_%m_%H%M')}.csv",
-            mime='text/csv',
+            label="📥 DESCARGAR REPORTE DETALLADO (EXCEL)",
+            data=buffer.getvalue(),
+            file_name=f"Arqueo_Rivas_{datetime.now().strftime('%d_%m_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
