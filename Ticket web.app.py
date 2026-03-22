@@ -10,67 +10,63 @@ URL_SHEET = "https://docs.google.com/spreadsheets/d/1d_r4IWEjW1LMiVRlZbddWo1MTva
 # 2. Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. Leer datos manteniendo el ORDEN ORIGINAL
+# 3. Leer datos con TTL=0 (Vital para evitar el reinicio al refrescar)
 try:
-    # ttl=0 para datos frescos
+    # ttl=0 obliga a la app a leer el Excel real en cada refresco, no una copia guardada
     df_base = conn.read(spreadsheet=URL_SHEET, ttl=0)
     df_base.columns = df_base.columns.str.strip()
-    
-    # Creamos una lista con el orden original de los productos
     lista_ordenada = df_base['PRODUCTO'].tolist()
 
     if 'ventas' not in st.session_state:
         st.session_state.ventas = df_base.set_index('PRODUCTO')['CANTIDAD'].to_dict()
         st.session_state.precios = df_base.set_index('PRODUCTO')['PRECIO'].to_dict()
-        st.session_state.autenticado = False
-
 except Exception as e:
     st.error(f"❌ Error de Conexión: {e}")
     st.stop()
 
-# 4. Función de Guardado Permanente
-def guardar_datos():
+# 4. Función de Guardado que "empuja" los datos al Excel inmediatamente
+def guardar_y_actualizar():
     try:
-        # Reconstruimos el DataFrame respetando el orden de la lista original
-        datos_fila = []
+        datos_actualizados = []
         for p in lista_ordenada:
-            datos_fila.append({
+            datos_actualizados.append({
                 'PRODUCTO': p,
                 'CANTIDAD': st.session_state.ventas[p],
                 'PRECIO': st.session_state.precios[p]
             })
-        df_update = pd.DataFrame(datos_fila)
-        conn.update(spreadsheet=URL_SHEET, data=df_update)
-        st.toast("✅ Guardado en la Nube")
+        df_para_subir = pd.DataFrame(datos_actualizados)
+        # Esto sobreescribe el Google Sheets con los nuevos valores
+        conn.update(spreadsheet=URL_SHEET, data=df_para_subir)
+        st.toast("✅ Guardado en Google Sheets")
     except Exception as e:
-        st.error(f"Error al guardar: {e}")
+        st.error(f"No se pudo guardar: {e}")
 
-# --- INTERFAZ ---
+# --- INTERFAZ (Tal cual te gusta) ---
 st.title("🎫 REGISTRO DE ENTRADAS - EVENTO")
 st.markdown("---")
 
-# Cuadrícula de productos (4 columnas) usando la lista ordenada
 cols = st.columns(4)
 for i, producto in enumerate(lista_ordenada):
     with cols[i % 4]:
         with st.container(border=True):
             st.markdown(f"**{producto}**")
-            cant = st.session_state.ventas[producto]
-            st.write(f"Tickets: {cant}")
+            # Mostramos el valor actual del Excel/Session State
+            cant_actual = st.session_state.ventas[producto]
+            st.write(f"Tickets: {cant_actual}")
             
             c1, c2 = st.columns(2)
             if c1.button("➕", key=f"add_{i}", use_container_width=True):
                 st.session_state.ventas[producto] += 1
-                guardar_datos()
+                guardar_y_actualizar() # <--- GUARDADO INSTANTÁNEO
                 st.rerun()
                 
             if c2.button("Corr.", key=f"corr_{i}", use_container_width=True):
                 if st.session_state.ventas[producto] > 0:
                     st.session_state.ventas[producto] -= 1
-                    guardar_datos()
+                    guardar_y_actualizar() # <--- GUARDADO INSTANTÁNEO
                     st.rerun()
 
-# --- REPORTE Y EXCEL ---
+# --- PANEL DE ARQUEO Y EXCEL (Manteniendo tu función de reporte) ---
 st.markdown("---")
 with st.expander("🔐 PANEL DE ARQUEO Y DESCARGA"):
     clave = st.text_input("Clave Admin", type="password")
@@ -83,11 +79,8 @@ with st.expander("🔐 PANEL DE ARQUEO Y DESCARGA"):
         
         df_final = pd.DataFrame(resumen)
         st.table(df_final)
+        st.metric("RECAUDACIÓN TOTAL", f"C$ {df_final['TOTAL'].sum():,.2f}")
         
-        total_recaudado = df_final["TOTAL"].sum()
-        st.metric("RECAUDACIÓN TOTAL", f"C$ {total_recaudado:,.2f}")
-        
-        # --- GENERAR EXCEL PARA DESCARGA ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, index=False, sheet_name='Arqueo')
