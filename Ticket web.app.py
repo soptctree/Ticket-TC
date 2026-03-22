@@ -4,7 +4,7 @@ from datetime import datetime
 import io
 
 # 1. Configuración de la aplicación
-st.set_page_config(page_title="Control TC", layout="wide")
+st.set_page_config(page_title="Sistema de Control", layout="wide")
 
 # 2. Estilo Visual Compacto
 st.markdown("""
@@ -15,7 +15,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Inicialización SEGURA de Datos (Aquí es donde estaba el error)
+# 3. Inicialización de Datos
 if 'ventas' not in st.session_state:
     productos = [
         "AGUA LUNA VIDRIO", "AGUA GASIFICADA ORIGINA", "AGUA GASIFICA DE LIMÓN",
@@ -27,9 +27,9 @@ if 'ventas' not in st.session_state:
         "AGUA LUNA LATA", "NICA HURACÁN", "VITALI", "EXTRA"
     ]
     st.session_state.ventas = {p: 0 for p in productos}
-    st.session_state.log = []  # <--- Esto evita el error de la imagen
+    st.session_state.log = [] 
     
-    # PRECIOS REALES EDITADOS AQUÍ
+    # Precios fijos (ajústalos según necesites)
     st.session_state.precios = {
         "AGUA LUNA VIDRIO": 30, "AGUA GASIFICADA ORIGINA": 35, "AGUA GASIFICA DE LIMÓN": 35,
         "AGUA LUNA GASIFICADA FRESA": 35, "AGUA LUNA SIN GAS": 25, "BORIAL": 40,
@@ -41,7 +41,8 @@ if 'ventas' not in st.session_state:
         "NICA HURACÁN": 45, "VITALI": 35, "EXTRA": 40
     }
 
-st.title("🎫 Registro de Entradas - Evento Rivas")
+# CAMBIO DE ENCABEZADO AQUÍ
+st.title("🚀 CONTROL DE INVENTARIO - SISTEMA WEB") 
 
 # 4. Interfaz de Botones (5 columnas)
 cols = st.columns(5)
@@ -78,7 +79,6 @@ with st.expander("🔐 Generar Reporte de Arqueo (Solo Admin)"):
             st.error("Clave Incorrecta")
 
     if st.session_state.get('autenticado', False):
-        # Crear tabla de datos
         datos = []
         for p, cant in st.session_state.ventas.items():
             precio = st.session_state.precios.get(p, 0)
@@ -88,7 +88,6 @@ with st.expander("🔐 Generar Reporte de Arqueo (Solo Admin)"):
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.metric("TOTAL RECAUDADO", f"C$ {df['SUBTOTAL'].sum():,.2f}")
 
-        # Descarga Excel
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)
