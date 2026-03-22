@@ -49,8 +49,37 @@ if 'ventas' not in st.session_state:
     ]
     st.session_state.ventas = {p: 0 for p in productos}
     # Precios base (puedes editarlos aquí)
-    st.session_state.precios = {p: 0 for p in productos} 
-    st.session_state.log = []
+   # Precios reales para el evento en Rivas
+    st.session_state.precios = {
+        "AGUA LUNA VIDRIO": 30,
+        "AGUA GASIFICADA ORIGINA": 35,
+        "AGUA GASIFICA DE LIMÓN": 35,
+        "AGUA LUNA GASIFICADA FRESA": 35,
+        "AGUA LUNA SIN GAS": 25,
+        "BORIAL": 40,
+        "CORONA": 60,
+        "VICTORIA FROST": 45,
+        "RED BULL": 80,
+        "FDC 12 ANIO": 150,
+        "FDC 18 ANIO": 250,
+        "FDC 5 ANIO": 100,
+        "FDC CRISTALINO": 110,
+        "FDC 4 ANIO": 80,
+        "FDC 7 ANIO": 120,
+        "SAGATIBA": 90,
+        "AGUA DE SELTZER": 55,
+        "TEQUILA CHARRO BLANCO": 130,
+        "TEQUILA CHARRO REPOSADO": 140,
+        "TONIA": 40,
+        "VICTORIA CLÁSICA": 40,
+        "MARGARITA": 120,
+        "SANGRÍA": 100,
+        "LLUVIA PÚRPURA": 120,
+        "AGUA LUNA LATA": 30,
+        "NICA HURACÁN": 45,
+        "VITALI": 35,
+        "EXTRA": 40
+    }
 
 st.title("🎫 Registro de Entradas - Evento Rivas")
 
